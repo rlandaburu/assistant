@@ -90,4 +90,3 @@ def updateAssistantInstructions(assistant_id, instructions):
         assistant_id=assistant_id,
         instructions=instructions
     )
-
