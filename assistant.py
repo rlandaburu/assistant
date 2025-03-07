@@ -38,12 +38,12 @@ def createAssistant(file_ids, title, model, temperature, instructions):
         "vector_store_id": vector_store.id,
         "model": model,
         "temperature": temperature,
-        "conversation": []
+        "conversation": [],
+        "uploaded_files": [os.path.basename(fid) for fid in file_ids]
     }
     save_config(config)
 
     return assistant.id, vector_store.id
-
 
 def saveFileOpenAI(location):
     client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
@@ -71,11 +71,10 @@ def checkRunStatus(thread_id, run_id):
 def retrieveThread(thread_id):
     client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
     messages = client.beta.threads.messages.list(thread_id)
-    thread_messages = [{
+    return [{
         'content': m.content[0].text.value,
         'role': m.role
     } for m in messages.data[::-1]]
-    return thread_messages
 
 def addMessageToThread(thread_id, prompt):
     client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
