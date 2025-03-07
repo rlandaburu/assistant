@@ -83,3 +83,8 @@ def retrieveThread(thread_id):
 def addMessageToThread(thread_id, prompt):
     client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
     client.beta.threads.messages.create(thread_id, role="user", content=prompt)
+
+def updateVectorStoreWithFiles(vector_store_id, file_ids):
+    client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+    client.beta.vector_stores.files.create(vector_store_id=vector_store_id, file_ids=file_ids)
+
