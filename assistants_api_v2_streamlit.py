@@ -2,13 +2,13 @@ import streamlit as st
 from assistant import *
 import time
 
-def process_run(st, thread_id, assistant_id):
+def process_run(thread_id, assistant_id):
     run_id = runAssistant(thread_id, assistant_id)
     status = 'running'
 
     while status != 'completed':
-        with st.spinner('Waiting for assistant response . . .'):
-            time.sleep(10)  # Faster refresh for testing
+        with st.spinner('Waiting for assistant response...'):
+            time.sleep(5)
             status = checkRunStatus(thread_id, run_id)
 
     thread_messages = retrieveThread(thread_id)
@@ -18,21 +18,32 @@ def process_run(st, thread_id, assistant_id):
     config[assistant_id]['conversation'] = thread_messages
     save_config(config)
 
+    st.write("### Conversation:")
     for message in thread_messages:
-        role = 'User' if message['role'] == 'user' else 'Assistant'
+        role = "👤 User" if message['role'] == 'user' else "🤖 Assistant"
         st.markdown(f"**{role}:** {message['content']}")
 
 def main():
-    st.title("Chatwoot Assistant Playground")
+    st.title("🧠 OpenAI Assistant Playground")
+
     config = load_config()
+    assistant_names = {v['title']: k for k, v in config.items()}
 
-    if 'assistant_initialized' not in st.session_state:
-        title = st.text_input("Assistant Title", key="title")
-        initiation = st.text_input("First Question to Assistant", key="initiation")
-        model = st.selectbox("Select Model", ["gpt-4-turbo", "gpt-3.5-turbo"], key="model")
-        temperature = st.slider("Set Temperature", 0.0, 1.0, 0.7, key="temperature")
+    # Sidebar for assistant selection
+    st.sidebar.title("🔧 Manage Assistants")
+    selected_assistant_name = st.sidebar.selectbox(
+        "Select existing assistant", 
+        ["➕ Create New Assistant"] + list(assistant_names.keys())
+    )
 
-        uploaded_files = st.file_uploader("Upload Files", accept_multiple_files=True, key="uploader")
+    if selected_assistant_name == "➕ Create New Assistant":
+        # Create new assistant interface
+        st.header("✨ Create a New Assistant")
+        title = st.text_input("Assistant Title", key="new_title")
+        initiation = st.text_input("Initial Question", key="new_initiation")
+        model = st.selectbox("Model", ["gpt-4-turbo", "gpt-3.5-turbo"], key="new_model")
+        temperature = st.slider("Temperature", 0.0, 1.0, 0.7, key="new_temp")
+        uploaded_files = st.file_uploader("Upload Files", accept_multiple_files=True, key="new_files")
 
         if uploaded_files and title and initiation:
             file_locations = []
@@ -41,7 +52,7 @@ def main():
                 with open(location, "wb") as f:
                     f.write(uploaded_file.getvalue())
                 file_locations.append(location)
-                st.success(f'{uploaded_file.name} uploaded successfully.')
+                st.success(f'Uploaded {uploaded_file.name}')
 
             with st.spinner('Creating assistant...'):
                 file_ids = [saveFileOpenAI(loc) for loc in file_locations]
@@ -49,32 +60,55 @@ def main():
 
             thread_id = startAssistantThread(initiation, vector_id)
 
-            st.session_state.update({
-                "thread_id": thread_id,
-                "assistant_id": assistant_id,
-                "assistant_initialized": True,
-                "last_message": initiation
-            })
+            st.success("Assistant created successfully!")
+            process_run(thread_id, assistant_id)
 
-            st.success("Assistant initialized!")
-            st.write(f"**Assistant ID:** {assistant_id}")
-            st.write(f"**Vector Store ID:** {vector_id}")
-            st.write(f"**Thread ID:** {thread_id}")
+    else:
+        # Existing assistant selected
+        assistant_id = assistant_names[selected_assistant_name]
+        assistant = config[assistant_id]
+        
+        st.header(f"🗣️ Assistant: {selected_assistant_name}")
+        st.write(f"**Model:** {assistant['model']}")
+        st.write(f"**Temperature:** {assistant['temperature']}")
 
-            process_run(st, thread_id, assistant_id)
+        # Continue existing conversation or ask new question
+        last_conversation = assistant.get('conversation', [])
+        if last_conversation:
+            st.write("### Last conversation:")
+            for message in last_conversation:
+                role = "👤 User" if message['role'] == 'user' else "🤖 Assistant"
+                st.markdown(f"**{role}:** {message['content']}")
 
-    # Follow-up conversations
-    if st.session_state.get('assistant_initialized'):
-        follow_up = st.text_input("Follow-up Question", key="follow_up")
-        if st.button("Submit Follow-up") and follow_up and follow_up != st.session_state["last_message"]:
-            st.session_state["last_message"] = follow_up
-            addMessageToThread(st.session_state["thread_id"], follow_up)
-            process_run(st, st.session_state["thread_id"], st.session_state["assistant_id"])
+        follow_up = st.text_input("Continue the conversation...", key="follow_up_existing")
+        uploaded_files = st.file_uploader("Upload Additional Files (optional)", accept_multiple_files=True, key="additional_files")
 
-    # Display assistant configuration & history
-    if st.sidebar.button("Show Assistant Configurations"):
-        st.sidebar.json(config)
+        if st.button("Submit"):
+            vector_store_id = assistant['vector_store_id']
+            if uploaded_files:
+                file_locations = []
+                for uploaded_file in uploaded_files:
+                    location = f"temp_{uploaded_file.name}"
+                    with open(location, "wb") as f:
+                        f.write(uploaded_file.getvalue())
+                    file_locations.append(location)
+                    st.success(f'Uploaded {uploaded_file.name}')
+                
+                # Update vector store with new files
+                file_ids = [saveFileOpenAI(loc) for loc in file_locations]
+                updateVectorStoreWithFiles(vector_store_id, file_ids)
+                st.success("Vector store updated with new files!")
+
+            # Start or continue thread
+            thread_id = assistant.get("thread_id")
+            if not thread_id:
+                thread_id = startAssistantThread(follow_up, vector_store_id)
+                config[assistant_id]["thread_id"] = thread_id
+                save_config(config)
+            else:
+                addMessageToThread(thread_id, follow_up)
+
+            process_run(thread_id, assistant_id)
 
 if __name__ == "__main__":
     main()
-
