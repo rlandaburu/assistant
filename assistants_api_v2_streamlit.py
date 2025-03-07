@@ -23,10 +23,6 @@ if not st.session_state.authenticated:
             st.error("Contraseña incorrecta.")
 else:
 
-
-
-    # Después de la autenticación (else):
-else:
     def process_run(thread_id, assistant_id):
         run_id = runAssistant(thread_id, assistant_id)
         status = 'running'
