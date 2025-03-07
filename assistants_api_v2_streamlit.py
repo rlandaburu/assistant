@@ -3,79 +3,78 @@ from assistant import *
 import time
 
 def process_run(st, thread_id, assistant_id):
-    # Run the Assistant
     run_id = runAssistant(thread_id, assistant_id)
     status = 'running'
 
-    # Check Status Session
     while status != 'completed':
         with st.spinner('Waiting for assistant response . . .'):
-            time.sleep(20)  # 20-second delay
+            time.sleep(10)  # Faster refresh for testing
             status = checkRunStatus(thread_id, run_id)
 
-    # Retrieve the Thread Messages
     thread_messages = retrieveThread(thread_id)
+
+    # Update conversation log in JSON
+    config = load_config()
+    config[assistant_id]['conversation'] = thread_messages
+    save_config(config)
+
     for message in thread_messages:
-        if message['role'] == 'user':
-            st.write('User Message:', message['content'])
-        else:
-            st.write('Assistant Response:', message['content'])
+        role = 'User' if message['role'] == 'user' else 'Assistant'
+        st.markdown(f"**{role}:** {message['content']}")
 
 def main():
-    st.title("Chatwoot Assistant V2")
-    """
-    My name is Karabo, your personal AI Assistant. I create file_search assistants, just upload your knowledge base and start chatting to your documents.
-    """
+    st.title("Chatwoot Assistant Playground")
+    config = load_config()
 
     if 'assistant_initialized' not in st.session_state:
-        # Input field for the title
-        title = st.text_input("Enter the title", key="title")
-        initiation = st.text_input("Enter the assistant's first question", key="initiation")
+        title = st.text_input("Assistant Title", key="title")
+        initiation = st.text_input("First Question to Assistant", key="initiation")
+        model = st.selectbox("Select Model", ["gpt-4-turbo", "gpt-3.5-turbo"], key="model")
+        temperature = st.slider("Set Temperature", 0.0, 1.0, 0.7, key="temperature")
 
-        # File uploader widget
-        uploaded_files = st.file_uploader("Upload Files for the Assistant", accept_multiple_files=True, key="uploader")
-        file_locations = []
+        uploaded_files = st.file_uploader("Upload Files", accept_multiple_files=True, key="uploader")
 
         if uploaded_files and title and initiation:
+            file_locations = []
             for uploaded_file in uploaded_files:
-                # Read file as bytes
-                bytes_data = uploaded_file.getvalue()
-                location = f"temp_file_{uploaded_file.name}"
-                # Save each file with a unique name
+                location = f"temp_{uploaded_file.name}"
                 with open(location, "wb") as f:
-                    f.write(bytes_data)
+                    f.write(uploaded_file.getvalue())
                 file_locations.append(location)
-                st.success(f'File {uploaded_file.name} has been uploaded successfully.')
+                st.success(f'{uploaded_file.name} uploaded successfully.')
 
-            # Upload file and create assistant
-            with st.spinner('Processing your file and setting up the assistant...'):
-                file_ids = [saveFileOpenAI(location) for location in file_locations]
-                assistant_id, vector_id = createAssistant(file_ids, title)
+            with st.spinner('Creating assistant...'):
+                file_ids = [saveFileOpenAI(loc) for loc in file_locations]
+                assistant_id, vector_id = createAssistant(file_ids, title, model, temperature)
 
-            # Start the Thread
             thread_id = startAssistantThread(initiation, vector_id)
 
-            # Save state
-            st.session_state.thread_id = thread_id
-            st.session_state.assistant_id = assistant_id
-            st.session_state.last_message = initiation
-            st.session_state.assistant_initialized = True
+            st.session_state.update({
+                "thread_id": thread_id,
+                "assistant_id": assistant_id,
+                "assistant_initialized": True,
+                "last_message": initiation
+            })
 
-            st.write("Assistant ID:", assistant_id)
-            st.write("Vector ID:", vector_id)
-            st.write("Thread ID:", thread_id)
+            st.success("Assistant initialized!")
+            st.write(f"**Assistant ID:** {assistant_id}")
+            st.write(f"**Vector Store ID:** {vector_id}")
+            st.write(f"**Thread ID:** {thread_id}")
 
             process_run(st, thread_id, assistant_id)
 
-    # Handling follow-up questions only if assistant is initialized
-    if 'assistant_initialized' in st.session_state and st.session_state.assistant_initialized:
-        follow_up = st.text_input("Enter your follow-up question", key="follow_up")
-        submit_button = st.button("Submit Follow-up")
+    # Follow-up conversations
+    if st.session_state.get('assistant_initialized'):
+        follow_up = st.text_input("Follow-up Question", key="follow_up")
+        if st.button("Submit Follow-up") and follow_up and follow_up != st.session_state["last_message"]:
+            st.session_state["last_message"] = follow_up
+            addMessageToThread(st.session_state["thread_id"], follow_up)
+            process_run(st, st.session_state["thread_id"], st.session_state["assistant_id"])
 
-        if submit_button and follow_up and follow_up != st.session_state.last_message:
-            st.session_state.last_message = follow_up
-            addMessageToThread(st.session_state.thread_id, follow_up)
-            process_run(st, st.session_state.thread_id, st.session_state.assistant_id)
+    # Display assistant configuration & history
+    if st.sidebar.button("Show Assistant Configurations"):
+        st.sidebar.json(config)
 
 if __name__ == "__main__":
     main()
+
