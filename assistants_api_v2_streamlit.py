@@ -5,127 +5,96 @@ import time
 def process_run(thread_id, assistant_id):
     run_id = runAssistant(thread_id, assistant_id)
     status = 'running'
-
     while status != 'completed':
-        with st.spinner('Esperando respuesta del asistente...'):
+        with st.spinner("🔄 Procesando respuesta..."):
             time.sleep(5)
             status = checkRunStatus(thread_id, run_id)
 
-    thread_messages = retrieveThread(thread_id)
-
+    messages = retrieveThread(thread_id)
     config = load_config()
-    config[assistant_id]['conversation'] = thread_messages
+    config[assistant_id]['conversation'] = messages
     save_config(config)
 
-    st.write("### Conversación actual:")
-    for message in thread_messages:
-        role = "👤 Usuario" if message['role'] == 'user' else "🤖 Asistente"
-        st.markdown(f"**{role}:** {message['content']}")
+    for msg in messages:
+        role = "🔵 Usuario" if msg['role'] == 'user' else "🟢 Asistente"
+        st.markdown(f"**{role}:** {msg['content']}")
 
 def main():
     st.title("🧠 OpenAI Assistant Playground")
-
     config = load_config()
     assistant_names = {v['title']: k for k, v in config.items()}
 
-    # Barra lateral para seleccionar o crear asistente
-    st.sidebar.title("🔧 Asistentes")
-    selected_assistant_name = st.sidebar.selectbox(
-        "Selecciona un asistente existente", 
+    st.sidebar.title("🔧 Asistentes Guardados")
+    selected = st.sidebar.selectbox(
+        "Selecciona un asistente:",
         ["➕ Crear nuevo asistente"] + list(assistant_names.keys())
     )
 
-    if selected_assistant_name == "➕ Crear nuevo asistente":
+    st.sidebar.info("🔖 **Nota:** Los asistentes creados se guardan aquí para uso rápido posterior.")
+
+    if selected == "➕ Crear nuevo asistente":
         st.header("✨ Crear Nuevo Asistente")
-        title = st.text_input("Título del Asistente")
-        instructions = st.text_area("Prompt del Asistente (instrucciones personalizadas)", 
-                                    "Eres un asistente útil. Usa tu base de conocimiento para responder.")
+        title = st.text_input("Título del asistente")
+        instructions = st.text_area("Prompt personalizado", "Eres un asistente útil.")
         initiation = st.text_input("Pregunta inicial")
         model = st.selectbox("Modelo", ["gpt-4-turbo", "gpt-3.5-turbo"])
         temperature = st.slider("Temperatura", 0.0, 1.0, 0.7)
-        uploaded_files = st.file_uploader("Subir archivos", accept_multiple_files=True)
+        files = st.file_uploader("Sube archivos", accept_multiple_files=True)
 
         if st.button("Crear Asistente"):
-            if uploaded_files and title and initiation:
-                file_locations = []
-                for uploaded_file in uploaded_files:
-                    location = f"temp_{uploaded_file.name}"
-                    with open(location, "wb") as f:
-                        f.write(uploaded_file.getvalue())
-                    file_locations.append(location)
-                    st.success(f'Archivo subido: {uploaded_file.name}')
+            if files and title and initiation:
+                locations = []
+                for file in files:
+                    loc = f"temp_{file.name}"
+                    with open(loc, "wb") as f:
+                        f.write(file.getvalue())
+                    locations.append(loc)
 
-                with st.spinner('Creando asistente...'):
-                    file_ids = [saveFileOpenAI(loc) for loc in file_locations]
-                    assistant_id, vector_id = createAssistant(file_ids, title, model, temperature, instructions)
-
+                file_ids = [saveFileOpenAI(loc) for loc in locations]
+                assistant_id, vector_id = createAssistant(file_ids, title, model, temperature, instructions)
                 thread_id = startAssistantThread(initiation, vector_id)
-                config = load_config()
+
                 config[assistant_id]["thread_id"] = thread_id
                 save_config(config)
-
-                st.success("¡Asistente creado con éxito!")
                 process_run(thread_id, assistant_id)
-            else:
-                st.error("Completa todos los campos y sube al menos un archivo.")
 
     else:
-        assistant_id = assistant_names[selected_assistant_name]
+        assistant_id = assistant_names[selected]
         assistant = config[assistant_id]
-        
-        st.header(f"🗣️ Asistente: {selected_assistant_name}")
-        st.write(f"**Modelo:** {assistant['model']}")
-        st.write(f"**Temperatura:** {assistant['temperature']}")
-
-        # Mostrar y editar instrucciones actuales
-        st.subheader("Instrucciones (Prompt)")
-        new_instructions = st.text_area("Editar instrucciones del asistente", assistant.get('instructions', 'Eres un asistente útil.'))
+        st.header(f"🗣️ {selected}")
+        instructions = st.text_area("Modificar prompt del asistente:", assistant.get('instructions'))
 
         if st.button("Actualizar instrucciones"):
-            updateAssistantInstructions(assistant_id, new_instructions)
-            config[assistant_id]['instructions'] = new_instructions
+            updateAssistantInstructions(assistant_id, instructions)
+            assistant['instructions'] = instructions
             save_config(config)
-            st.success("Instrucciones actualizadas correctamente.")
+            st.success("Instrucciones actualizadas.")
 
-        # Mostrar conversación previa si existe
-        last_conversation = assistant.get('conversation', [])
-        if last_conversation:
-            st.subheader("Última conversación:")
-            for message in last_conversation:
-                role = "👤 Usuario" if message['role'] == 'user' else "🤖 Asistente"
-                st.markdown(f"**{role}:** {message['content']}")
+        with st.expander("📁 Archivos del asistente"):
+            st.write(assistant.get('uploaded_files', []))
 
-        # Campo siempre disponible para continuar conversación
-        follow_up = st.text_input("Continuar conversación...")
-        uploaded_files = st.file_uploader("Subir archivos adicionales (opcional)", accept_multiple_files=True)
+        with st.expander("📑 Conversación previa"):
+            for msg in assistant.get('conversation', []):
+                role = "🔵 Usuario" if msg['role'] == 'user' else "🟢 Asistente"
+                st.markdown(f"**{role}:** {msg['content']}")
 
-        if st.button("Enviar Mensaje"):
-            vector_store_id = assistant['vector_store_id']
-            if uploaded_files:
-                file_locations = []
-                for uploaded_file in uploaded_files:
-                    location = f"temp_{uploaded_file.name}"
-                    with open(location, "wb") as f:
-                        f.write(uploaded_file.getvalue())
-                    file_locations.append(location)
-                    st.success(f'Archivo subido: {uploaded_file.name}')
-                
-                file_ids = [saveFileOpenAI(loc) for loc in file_locations]
-                updateVectorStoreWithFiles(vector_store_id, file_ids)
-                st.success("Archivos agregados al Vector Store!")
+        pregunta = st.text_input("💬 Continuar conversación aquí:")
+        extra_files = st.file_uploader("Agregar archivos (opcional)", accept_multiple_files=True)
 
-            thread_id = assistant.get("thread_id")
-            if not thread_id:
-                thread_id = startAssistantThread(follow_up, vector_store_id)
-                config[assistant_id]["thread_id"] = thread_id
-                save_config(config)
-            else:
-                addMessageToThread(thread_id, follow_up)
+        if st.button("Enviar al asistente"):
+            if extra_files:
+                locations = [f"temp_{f.name}" for f in extra_files]
+                for file, loc in zip(extra_files, locations):
+                    with open(loc, "wb") as f:
+                        f.write(file.getvalue())
+                ids = [saveFileOpenAI(l) for l in locations]
+                updateVectorStoreWithFiles(assistant['vector_store_id'], ids)
 
+            thread_id = assistant.get('thread_id') or startAssistantThread(pregunta, assistant['vector_store_id'])
+            assistant['thread_id'] = thread_id
+            save_config(config)
+            addMessageToThread(thread_id, pregunta)
             process_run(thread_id, assistant_id)
-
-    # Mostrar ubicación de almacenamiento
-    st.sidebar.info("📁 Las configuraciones y conversaciones se almacenan en `assistant_config.json`")
 
 if __name__ == "__main__":
     main()
