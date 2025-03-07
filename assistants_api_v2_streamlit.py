@@ -22,6 +22,25 @@ if not st.session_state.authenticated:
         else:
             st.error("Contraseña incorrecta.")
 else:
+
+
+
+    # Después de la autenticación (else):
+else:
+    def process_run(thread_id, assistant_id):
+        run_id = runAssistant(thread_id, assistant_id)
+        status = 'running'
+        while status != 'completed':
+            time.sleep(2)
+            status = checkRunStatus(thread_id, run_id)
+        return retrieveThread(thread_id)
+
+    def display_chat(messages):
+        for msg in messages:
+            role = msg['role']
+            with st.chat_message(role):
+                st.markdown(msg['content'])
+
     st.set_page_config(page_title="🧠 OpenAI Playground", layout="wide")
     st.title("🧠 OpenAI Assistant Playground")
 
