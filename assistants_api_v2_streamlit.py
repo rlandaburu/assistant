@@ -22,7 +22,7 @@ def process_run(st, thread_id, assistant_id):
             st.write('Assistant Response:', message['content'])
 
 def main():
-    st.title("🧑‍💻 Skolo Online 💬 Assistant V2")
+    st.title("Chatwoot Assistant V2")
     """
     My name is Karabo, your personal AI Assistant. I create file_search assistants, just upload your knowledge base and start chatting to your documents.
     """
