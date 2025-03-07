@@ -79,18 +79,14 @@ else:
             else:
                 st.warning("Completa ambos campos.")
 
-    selected = st.sidebar.selectbox(
-        "Selecciona un asistente existente:",
-        ["➕ Crear nuevo asistente"] + list(assistant_names.keys())
-    )
-
+    
     if selected == "➕ Crear nuevo asistente":
         st.header("✨ Crear Nuevo Asistente")
         title = st.text_input("Título del asistente")
         instructions = st.text_area("Prompt personalizado", "Eres un asistente útil.")
         initiation = st.text_input("Pregunta inicial")
-        model = st.selectbox("Modelo", ["gpt-4-turbo", "gpt-3.5-turbo"])
-        temperature = st.slider("Temperatura", 0.0, 1.0, 0.7)
+        model = st.selectbox("Modelo", ["gpt-4o-mini","gpt-4o","gpt-4-turbo", "gpt-3.5-turbo"])
+        temperature = st.slider("Temperatura", 0.0, 0.5, 0.5)
         files = st.file_uploader("Archivos para conocimiento", accept_multiple_files=True)
 
         if st.button("🚀 Crear Asistente"):
