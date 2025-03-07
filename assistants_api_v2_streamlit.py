@@ -53,30 +53,33 @@ else:
         ["➕ Crear nuevo asistente"] + list(assistant_names.keys())
     )
 
-    # Agregar asistente por ID
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("🔗 Agregar asistente por ID")
-    external_assistant_id = st.sidebar.text_input("Assistant ID existente:")
-    external_assistant_name = st.sidebar.text_input("Ponle un nombre al asistente:")
-    if st.sidebar.button("➕ Agregar asistente"):
-        if external_assistant_id and external_assistant_name:
-            client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-            assistant = client.beta.assistants.retrieve(external_assistant_id)
-            config[external_assistant_id] = {
-                "title": external_assistant_name,
-                "instructions": assistant.instructions,
-                "vector_store_id": assistant.tool_resources.file_search.vector_store_ids[0],
-                "model": assistant.model,
-                "temperature": assistant.temperature,
-                "conversation": [],
-                "uploaded_files": [],
-                "thread_id": None
-            }
-            save_config(config)
-            st.sidebar.success("Asistente agregado exitosamente.")
-            st.rerun()
-        else:
-            st.sidebar.error("Ingresa tanto el ID como un nombre válido.")
+    # Agregar asistente por ID (expandible)
+    with st.sidebar.expander("🔗 Agregar asistente por ID"):
+        external_assistant_id = st.text_input("Assistant ID existente:")
+        external_assistant_name = st.text_input("Ponle un nombre al asistente:")
+        if st.button("➕ Agregar asistente"):
+            if external_assistant_id and external_assistant_name:
+                try:
+                    client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+                    assistant = client.beta.assistants.retrieve(external_assistant_id)
+                    config[external_assistant_id] = {
+                        "title": external_assistant_name,
+                        "instructions": assistant.instructions,
+                        "vector_store_id": assistant.tool_resources.file_search.vector_store_ids[0],
+                        "model": assistant.model,
+                        "temperature": assistant.temperature,
+                        "conversation": [],
+                        "uploaded_files": [],
+                        "thread_id": None
+                    }
+                    save_config(config)
+                    st.success(f"Asistente '{external_assistant_name}' agregado exitosamente. Ahora búscalo en la lista de asistentes.")
+                    time.sleep(2)
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error al agregar asistente: {str(e)}")
+            else:
+                st.warning("Ingresa ID y nombre válidos.")
 
     st.sidebar.info("🔖 Los asistentes creados o agregados aparecen aquí.")
 
@@ -114,16 +117,13 @@ else:
                         "thread_id": thread_id
                     }
                     save_config(config)
-                    messages = process_run(thread_id, assistant_id)
 
-                st.success("Asistente creado con éxito.")
-                display_chat(messages)
-
-                if st.button("Ir al chat ahora"):
-                    st.rerun()
+                st.session_state.selected_assistant = assistant_id
+                st.success("Asistente creado con éxito. Ahora puedes iniciar la conversación desde abajo 👇.")
+                time.sleep(1.5)
+                st.rerun()
             else:
                 st.warning("Completa todos los campos y sube archivos.")
-
     else:
         assistant_id = assistant_names[selected]
         assistant = config[assistant_id]
@@ -145,16 +145,19 @@ else:
         st.header(f"💬 Chat con '{selected}'")
         st.info("💡 Usa la caja de chat abajo para interactuar con el asistente.")
 
-        messages = assistant.get('conversation', [])
-        display_chat(messages)
+        # Mostrar historial de conversación claramente
+        if assistant.get('conversation'):
+            with st.expander("📑 Historial de conversación"):
+                display_chat(assistant['conversation'])
 
+        # Campo para modificar prompt
         with st.expander("⚙️ Modificar instrucciones"):
             instructions = st.text_area("Prompt actual:", assistant.get('instructions'))
             if st.button("Actualizar instrucciones"):
                 updateAssistantInstructions(assistant_id, instructions)
                 assistant['instructions'] = instructions
                 save_config(config)
-                st.success("Instrucciones actualizadas.")
+                st.success("Instrucciones actualizadas correctamente.")
 
         prompt = st.chat_input("Escribe tu mensaje aquí...")
         if prompt:
@@ -171,7 +174,6 @@ else:
                 st.markdown(messages[-1]['content'])
 
             save_config(config)
-
 
 
 
