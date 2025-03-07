@@ -34,32 +34,32 @@ def main():
 
     if st.button("Crear Asistente"):
         if files and title and initiation:
-        locations = []
-        for file in files:
-            loc = f"temp_{file.name}"
-            with open(loc, "wb") as f:
-                f.write(file.getvalue())
-            locations.append(loc)
-
-        file_ids = [saveFileOpenAI(loc) for loc in locations]
-        assistant_id, vector_id = createAssistant(file_ids, title, model, temperature, instructions)
-        thread_id = startAssistantThread(initiation, vector_id)
-
-        # Solución aquí:
-        config = load_config()
-        config[assistant_id] = {
-            "title": title,
-            "instructions": instructions,
-            "vector_store_id": vector_id,
-            "model": model,
-            "temperature": temperature,
-            "conversation": [],
-            "uploaded_files": [file.name for file in files],
-            "thread_id": thread_id
-        }
-        save_config(config)
-
-        process_run(thread_id, assistant_id)
+            locations = []
+            for file in files:
+                loc = f"temp_{file.name}"
+                with open(loc, "wb") as f:
+                    f.write(file.getvalue())
+                locations.append(loc)
+    
+            file_ids = [saveFileOpenAI(loc) for loc in locations]
+            assistant_id, vector_id = createAssistant(file_ids, title, model, temperature, instructions)
+            thread_id = startAssistantThread(initiation, vector_id)
+    
+            # Solución aquí:
+            config = load_config()
+            config[assistant_id] = {
+                "title": title,
+                "instructions": instructions,
+                "vector_store_id": vector_id,
+                "model": model,
+                "temperature": temperature,
+                "conversation": [],
+                "uploaded_files": [file.name for file in files],
+                "thread_id": thread_id
+            }
+            save_config(config)
+    
+            process_run(thread_id, assistant_id)
 
 
     else:
