@@ -75,7 +75,7 @@ def main():
 
                 messages = process_run(thread_id, assistant_id)
                 display_chat(messages)
-                st.experimental_rerun()
+                st.rerun()
             else:
                 st.warning("Completa todos los campos y sube archivos.")
     else:
@@ -93,7 +93,7 @@ def main():
             del config[assistant_id]
             save_config(config)
             st.sidebar.success("Asistente eliminado.")
-            st.experimental_rerun()
+            st.rerun()
 
         st.header(f"🗣️ Chat con {selected}")
 
