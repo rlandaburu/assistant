@@ -1,6 +1,7 @@
 import streamlit as st
 from assistant import *
 import time
+from openai import OpenAI
 
 # Autenticación
 def authenticate(password):
@@ -31,6 +32,7 @@ else:
         messages = retrieveThread(thread_id)
         config = load_config()
         config[assistant_id]['conversation'] = messages
+        config[assistant_id]['thread_id'] = thread_id  # guardar thread_id siempre
         save_config(config)
         return messages
 
@@ -46,26 +48,28 @@ else:
     config = load_config()
     assistant_names = {v['title']: k for k, v in config.items()}
 
-    # Sidebar - Manejo asistentes
     st.sidebar.title("🔧 Asistentes Guardados")
     selected = st.sidebar.selectbox(
-        "Selecciona un asistente existente:",
+        "Selecciona un asistente:",
         ["➕ Crear nuevo asistente"] + list(assistant_names.keys())
     )
 
     # Agregar asistente por ID (expandible)
     with st.sidebar.expander("🔗 Agregar asistente por ID"):
         external_assistant_id = st.text_input("Assistant ID existente:")
-        external_assistant_name = st.text_input("Ponle un nombre al asistente:")
+        external_assistant_name = st.text_input("Ponle un nombre:")
         if st.button("➕ Agregar asistente"):
             if external_assistant_id and external_assistant_name:
                 try:
                     client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
                     assistant = client.beta.assistants.retrieve(external_assistant_id)
+                    vector_store_ids = assistant.tool_resources.file_search.vector_store_ids
+                    vector_store_id = vector_store_id = vector_store_id = vector_store_id = vector_store_id = vector_store_ids = vector_store_ids = assistant.tool_resources.file_search.vector_store_ids[0] if assistant.tool_resources.file_search.vector_store_ids else None
+
                     config[external_assistant_id] = {
                         "title": external_assistant_name,
                         "instructions": assistant.instructions,
-                        "vector_store_id": assistant.tool_resources.file_search.vector_store_ids[0],
+                        "vector_store_id": vector_store_id,
                         "model": assistant.model,
                         "temperature": assistant.temperature,
                         "conversation": [],
@@ -73,34 +77,35 @@ else:
                         "thread_id": None
                     }
                     save_config(config)
-                    st.success(f"Asistente '{external_assistant_name}' agregado exitosamente. Ahora búscalo en la lista de asistentes.")
+                    st.success(f"Asistente '{external_assistant_name}' agregado exitosamente. Selecciónalo ahora desde la lista.")
                     time.sleep(2)
                     st.rerun()
                 except Exception as e:
-                    st.error(f"Error al agregar asistente: {str(e)}")
+                    st.error(f"Error al agregar: {e}")
             else:
-                st.warning("Ingresa ID y nombre válidos.")
+                st.warning("Completa ambos campos.")
 
-    st.sidebar.info("🔖 Los asistentes creados o agregados aparecen aquí.")
+    st.sidebar.info("🔖 Los asistentes aparecen aquí una vez creados o agregados.")
 
-    if selected == "➕ Crear nuevo asistente":
+    if selected := st.sidebar.selectbox(
+        "Selecciona asistente:",
+        ["➕ Crear nuevo asistente"] + list(assistant_names.keys())
+    ) == "➕ Crear nuevo asistente":
         st.header("✨ Crear Nuevo Asistente")
-        title = st.text_input("Título del asistente")
-        instructions = st.text_area("Prompt personalizado", "Eres un asistente útil.")
+        title = st.text_input("Título")
+        instructions = st.text_area("Prompt", "Eres un asistente útil.")
         initiation = st.text_input("Pregunta inicial")
         model = st.selectbox("Modelo", ["gpt-4-turbo", "gpt-3.5-turbo"])
         temperature = st.slider("Temperatura", 0.0, 1.0, 0.7)
-        files = st.file_uploader("Archivos para conocimiento", accept_multiple_files=True)
+        files = st.file_uploader("Sube archivos", accept_multiple_files=True)
 
         if st.button("🚀 Crear Asistente"):
             if files and title and initiation:
-                with st.spinner("Creando asistente..."):
-                    locations = []
-                    for file in files:
-                        loc = f"temp_{file.name}"
+                with st.spinner("Creando..."):
+                    locations = [f"temp_{file.name}" for file in files]
+                    for file, loc in zip(files, locations):
                         with open(loc, "wb") as f:
                             f.write(file.getvalue())
-                        locations.append(loc)
 
                     file_ids = [saveFileOpenAI(loc) for loc in locations]
                     assistant_id, vector_id = createAssistant(file_ids, title, model, temperature, instructions)
@@ -117,11 +122,9 @@ else:
                         "thread_id": thread_id
                     }
                     save_config(config)
-
-                st.session_state.selected_assistant = assistant_id
-                st.success("Asistente creado con éxito. Ahora puedes iniciar la conversación desde abajo 👇.")
-                time.sleep(1.5)
-                st.rerun()
+                    st.success("✅ Asistente creado exitosamente. Comienza a chatear abajo.")
+                    time.sleep(1.5)
+                    st.rerun()
             else:
                 st.warning("Completa todos los campos y sube archivos.")
     else:
@@ -129,9 +132,8 @@ else:
         assistant = config[assistant_id]
 
         st.sidebar.subheader("📁 Archivos guardados")
-        files = assistant.get('uploaded_files')
-        if files:
-            for f in files:
+        if assistant.get('uploaded_files'):
+            for f in assistant['uploaded_files']:
                 st.sidebar.markdown(f"- 📄 `{f}`")
         else:
             st.sidebar.write("Sin archivos.")
@@ -139,27 +141,28 @@ else:
         if st.sidebar.button(f"❌ Eliminar '{selected}'"):
             del config[assistant_id]
             save_config(config)
-            st.sidebar.success("Asistente eliminado.")
+            st.sidebar.success("Eliminado correctamente.")
             st.rerun()
 
         st.header(f"💬 Chat con '{selected}'")
-        st.info("💡 Usa la caja de chat abajo para interactuar con el asistente.")
+        st.info("💡 Escribe abajo para interactuar.")
 
-        # Mostrar historial de conversación claramente
-        if assistant.get('conversation'):
+        messages = assistant.get('conversation', [])
+        if messages:
             with st.expander("📑 Historial de conversación"):
-                display_chat(assistant['conversation'])
+                display_chat(messages)
 
-        # Campo para modificar prompt
-        with st.expander("⚙️ Modificar instrucciones"):
-            instructions = st.text_area("Prompt actual:", assistant.get('instructions'))
-            if st.button("Actualizar instrucciones"):
-                updateAssistantInstructions(assistant_id, instructions)
-                assistant['instructions'] = instructions
-                save_config(config)
-                st.success("Instrucciones actualizadas correctamente.")
+        # Crear nuevos threads
+        if st.button("🔄 Crear nueva conversación (Thread)"):
+            new_thread_id = startAssistantThread("Hola", assistant['vector_store_id'])
+            assistant['thread_id'] = new_thread_id
+            assistant['conversation'] = []
+            save_config(config)
+            st.success("Nuevo thread creado, comienza la conversación desde abajo.")
+            time.sleep(1.5)
+            st.rerun()
 
-        prompt = st.chat_input("Escribe tu mensaje aquí...")
+        prompt = st.chat_input("Escribe aquí...")
         if prompt:
             with st.chat_message("user"):
                 st.markdown(prompt)
@@ -175,5 +178,8 @@ else:
 
             save_config(config)
 
-
+        # Mostrar historial
+        if assistant.get('conversation'):
+            with st.expander("📑 Ver historial completo"):
+                display_chat(assistant['conversation'])
 
