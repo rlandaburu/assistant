@@ -5,7 +5,7 @@ import os
 
 def createAssistant(file_ids, title):
     #Create the OpenAI Client Instance
-   client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+    client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
     #GET Instructions saved in the Settings.py File (We save the instructions there for easy access when modifying)
     instructions = """
