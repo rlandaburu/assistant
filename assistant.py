@@ -15,13 +15,8 @@ def save_config(data):
     with open(CONFIG_FILE, "w") as f:
         json.dump(data, f, indent=4)
 
-def createAssistant(file_ids, title, model, temperature):
+def createAssistant(file_ids, title, model, temperature, instructions):
     client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-
-    instructions = """
-    You are a helpful assistant. Use your knowledge base to answer user questions.
-    """
-
     tools = [{"type": "file_search"}]
 
     vector_store = client.beta.vector_stores.create(name=title, file_ids=file_ids)
@@ -39,6 +34,7 @@ def createAssistant(file_ids, title, model, temperature):
     config = load_config()
     config[assistant.id] = {
         "title": title,
+        "instructions": instructions,
         "vector_store_id": vector_store.id,
         "model": model,
         "temperature": temperature,
@@ -47,6 +43,7 @@ def createAssistant(file_ids, title, model, temperature):
     save_config(config)
 
     return assistant.id, vector_store.id
+
 
 def saveFileOpenAI(location):
     client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
@@ -87,4 +84,11 @@ def addMessageToThread(thread_id, prompt):
 def updateVectorStoreWithFiles(vector_store_id, file_ids):
     client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
     client.beta.vector_stores.files.create(vector_store_id=vector_store_id, file_ids=file_ids)
+
+def updateAssistantInstructions(assistant_id, instructions):
+    client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+    client.beta.assistants.update(
+        assistant_id=assistant_id,
+        instructions=instructions
+    )
 
