@@ -74,7 +74,7 @@ else:
         title = st.text_input("Título breve:")
         instructions = st.text_area("Prompt:", "Eres un asistente útil.")
         initiation = st.text_input("Primera pregunta:")
-        model = st.selectbox("Modelo:", [""gpt-4o-mini","gpt-4-turbo", "gpt-3.5-turbo"])
+        model = st.selectbox("Modelo:", ["gpt-4o-mini","gpt-4-turbo", "gpt-3.5-turbo"])
         temperature = st.slider("Temperatura:", 0.0, 0.5, 0.7)
         files = st.file_uploader("Subir archivos:", accept_multiple_files=True)
 
