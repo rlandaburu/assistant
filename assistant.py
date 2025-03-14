@@ -19,7 +19,7 @@ def createAssistant(file_ids, title, model, temperature, instructions):
     client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
     tools = [{"type": "file_search"}]
 
-    vector_store = client.beta.vector_stores.create(name=title, file_ids=file_ids)
+    vector_store = client.vector_stores.create(name=title, file_ids=file_ids)
     tool_resources = {"file_search": {"vector_store_ids": [vector_store.id]}}
 
     assistant = client.beta.assistants.create(
@@ -82,7 +82,7 @@ def addMessageToThread(thread_id, prompt):
 
 def updateVectorStoreWithFiles(vector_store_id, file_ids):
     client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-    client.beta.vector_stores.files.create(vector_store_id=vector_store_id, file_ids=file_ids)
+    client.vector_stores.files.create(vector_store_id=vector_store_id, file_ids=file_ids)
 
 def updateAssistantInstructions(assistant_id, instructions):
     client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
